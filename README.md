@@ -62,6 +62,6 @@ This edition uses **JavaScript Obfuscation** to protect the internal municipal d
 
 ---
 
-*Created by Infinity — Strengthening the Mesh network, one node at a time.*
+*Created by Infinity & Brizzik — Strengthening the Mesh network, one node at a time.*
 
 ---
