@@ -1,1 +1,157 @@
-<content of the file goes here>
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+    <meta charset="utf-8">
+    <title>MeshCore Geo Configurator by Infinity</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin=""/>
+    <style>
+        body { margin: 0; padding: 0; background-color: #000; color: #4af626; font-family: 'Consolas', monospace; height: 100vh; display: flex; justify-content: center; align-items: center; overflow: hidden; }
+        #bg-canvas { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: -1; opacity: 0.25; }
+        .main-wrapper { display: flex; width: 98vw; height: 94vh; background: rgba(5, 5, 5, 0.9); border: 1px solid #4af626; border-radius: 8px; box-shadow: 0 0 40px rgba(74, 246, 38, 0.2); overflow: hidden; position: relative; }
+        #map { flex: 1; height: 100% !important; min-height: 100%; border-right: 1px solid #4af626; z-index: 1; }
+        .controls-panel { width: 420px; height: 100%; padding: 20px; display: flex; flex-direction: column; background: rgba(0, 0, 0, 0.95); box-sizing: border-box; z-index: 2; }
+        .search-box { position: relative; margin-bottom: 20px; }
+        #city-search { width: 100%; padding: 12px; background: #000; border: 1px solid #4af626; color: #4af626; font-family: inherit; box-sizing: border-box; outline: none; }
+        #suggestions { position: absolute; top: 100%; left: 0; width: 100%; background: #050505; border: 1px solid #4af626; border-top: none; max-height: 200px; overflow-y: auto; z-index: 100; display: none; }
+        .suggestion-item { padding: 10px; cursor: pointer; border-bottom: 1px solid #1a5a0f; font-size: 0.9em; }
+        .suggestion-item:hover { background: #4af626; color: #000; }
+        h2 { margin: 0 0 15px 0; font-size: 1.1em; text-align: center; color: #4af626; border-bottom: 1px solid #1a5a0f; padding-bottom: 10px; text-transform: uppercase; letter-spacing: 2px; }
+        .slider-box { margin-bottom: 15px; text-align: center; width: 100%; background: rgba(74, 246, 38, 0.05); padding: 10px; border-radius: 4px; box-sizing: border-box; border: 1px solid #1a5a0f; }
+        .label-main { font-size: 0.8em; display: block; margin-bottom: 5px; color: #888; text-transform: uppercase; }
+        .slider-val { color: #4af626; font-weight: bold; font-size: 2.8em; display: block; line-height: 1; text-shadow: 0 0 10px rgba(74, 246, 38, 0.6); }
+        input[type=range] { width: 100%; margin: 10px 0; accent-color: #4af626; cursor: pointer; }
+        .output-container { flex: 1; display: flex; flex-direction: column; min-height: 0; margin-bottom: 10px; }
+        .output { background: #000; color: #4af626; padding: 15px; border: 1px solid #1a5a0f; font-size: 11px; overflow-y: auto; flex: 1; white-space: pre-wrap; line-height: 1.4; }
+        button { padding: 15px; background: transparent; border: 1px solid #4af626; color: #4af626; cursor: pointer; font-family: inherit; font-weight: bold; text-transform: uppercase; }
+        button:hover { background: #4af626; color: #000; }
+    </style>
+</head>
+<body>
+<canvas id="bg-canvas"></canvas>
+<div class="main-wrapper">
+    <div id="map"></div>
+    <div class="controls-panel">
+        <h2>MeshCore Region Configurator</h2>
+        <div class="search-box">
+            <span class="label-main">Zoek een stad</span>
+            <input type="text" id="city-search" placeholder="Type stadnaam..." autocomplete="off">
+            <div id="suggestions"></div>
+        </div>
+        <div class="slider-box">
+            <span class="label-main">STRAAL</span>
+            <span id="val" class="slider-val">10</span>
+            <input id="range" type="range" min="5" max="25" value="10">
+            <span style="font-size: 1.4em; color: #555;">KILOMETER BEREIK</span>
+        </div>
+        <div class="output-container">
+            <div id="code-output" class="output">Klik op de kaart of zoek een stad...</div>
+        </div>
+        <button id="copy-btn" onclick="copyConfig()">⚡ COPY CONFIGURATION</button>
+    </div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+<script src="./nl-locode-db.js"></script>
+<script>
+(function() {
+    const map = L.map('map', { center: [52.1326, 5.2913], zoom: 8, zoomControl: false });
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png').addTo(map);
+
+    const _valDisplay = document.getElementById('val');
+    const _rangeSlider = document.getElementById('range');
+    const _output = document.getElementById('code-output');
+    const _searchInput = document.getElementById('city-search');
+    const _suggestions = document.getElementById('suggestions');
+    
+    let selectedPoint = null;
+    let visualCircle = null;
+
+    // Zoekfunctie
+    _searchInput.addEventListener('input', function() {
+        const val = this.value.toLowerCase();
+        _suggestions.innerHTML = '';
+        if (val.length < 2) { _suggestions.style.display = 'none'; return; }
+        const matches = window.__NL_LOCODE_DB.filter(c => c[0].toLowerCase().includes(val)).slice(0, 10);
+        if (matches.length > 0) {
+            _suggestions.style.display = 'block';
+            matches.forEach(city => {
+                const div = document.createElement('div');
+                div.className = 'suggestion-item';
+                div.innerText = `${city[0]} (${city[2] || '??'})`;
+                div.onclick = () => {
+                    _searchInput.value = city[0];
+                    _suggestions.style.display = 'none';
+                    selectCity(city[3], city[4]);
+                };
+                _suggestions.appendChild(div);
+            });
+        }
+    });
+
+    function selectCity(lat, lng) {
+        selectedPoint = L.latLng(lat, lng);
+        map.flyTo(selectedPoint, 11);
+        updateSelection();
+    }
+
+    map.on('click', e => selectCity(e.latlng.lat, e.latlng.lng));
+
+    function updateSelection() {
+        if (!selectedPoint) return;
+        const radiusKm = parseInt(_rangeSlider.value);
+        _valDisplay.innerText = radiusKm;
+        if (visualCircle) map.removeLayer(visualCircle);
+        visualCircle = L.circle(selectedPoint, { radius: radiusKm * 1000, color: '#4af626', weight: 1, fillOpacity: 0.1 }).addTo(map);
+        const found = window.__NL_LOCODE_DB.filter(city => selectedPoint.distanceTo(L.latLng(city[3], city[4])) <= (radiusKm * 1000));
+        generateConfig(found);
+    }
+
+    function generateConfig(cities) {
+        if (cities.length === 0) { _output.innerText = "Geen steden gevonden."; return; }
+
+        const cleanedCities = cities.map(c => {
+            let p = (c[2] && c[2].trim() !== "") ? c[2].toLowerCase() : null;
+            if (!p) {
+                let bestDist = Infinity, bestP = "nl";
+                window.__NL_LOCODE_DB.forEach(db => {
+                    if (db[2]) {
+                        let d = L.latLng(c[3], c[4]).distanceTo(L.latLng(db[3], db[4]));
+                        if (d < bestDist) { bestDist = d; bestP = db[2].toLowerCase(); }
+                    }
+                });
+                p = bestP;
+            }
+            return { code: c[1].toLowerCase(), prov: p };
+        });
+
+        let sP = new Set(), res = ["region put nl"];
+        cleanedCities.forEach(c => sP.add(c.prov));
+        sP.forEach(p => res.push(`region put nl-${p} nl`));
+        cleanedCities.forEach(c => {
+            res.push(`region put nl-${c.code} nl`);
+            res.push(`region put nl-${c.prov}-${c.code} nl-${c.prov}`);
+        });
+        res.push("region allowf nl");
+        sP.forEach(p => res.push(`region allowf nl-${p}`));
+        cleanedCities.forEach(c => {
+            res.push(`region allowf nl-${c.code}`);
+            res.push(`region allowf nl-${c.prov}-${c.code}`);
+        });
+        const home = cleanedCities[0];
+        res.push(`region home nl-${home.prov}-${home.code}`, "region save");
+        _output.innerText = res.join("\n");
+    }
+
+    _rangeSlider.oninput = updateSelection;
+    window.copyConfig = () => {
+        navigator.clipboard.writeText(_output.innerText).then(() => {
+            const btn = document.getElementById('copy-btn');
+            btn.innerText = "COPIED!";
+            setTimeout(() => btn.innerText = "⚡ COPY CONFIGURATION", 1000);
+        });
+    };
+    setTimeout(() => map.invalidateSize(), 200);
+})();
+</script>
+</body>
+</html>
