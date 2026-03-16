@@ -2,6 +2,7 @@
 <html lang="nl">
 <head>
     <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>MeshCore Geo Configurator by Infinity</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin=""/>
     <style>
@@ -24,6 +25,50 @@
         .output { background: #000; color: #4af626; padding: 15px; border: 1px solid #1a5a0f; font-size: 11px; overflow-y: auto; flex: 1; white-space: pre-wrap; line-height: 1.4; }
         button { padding: 15px; background: transparent; border: 1px solid #4af626; color: #4af626; cursor: pointer; font-family: inherit; font-weight: bold; text-transform: uppercase; }
         button:hover { background: #4af626; color: #000; }
+
+        /* Mobile / small screens */
+        @media (max-width: 768px) {
+            body {
+                align-items: flex-start;
+                height: auto;
+                overflow: auto;
+            }
+            .main-wrapper {
+                flex-direction: column;
+                width: 100vw;
+                height: auto;
+                max-width: none;
+                max-height: none;
+                border-radius: 0;
+                border-left: none;
+                border-right: none;
+            }
+            #map {
+                width: 100%;
+                height: 40vh !important;
+                min-height: 40vh;
+                border-right: none;
+                border-bottom: 1px solid #4af626;
+            }
+            .controls-panel {
+                width: 100%;
+                height: auto;
+                padding: 12px;
+            }
+            .slider-box {
+                margin-bottom: 10px;
+            }
+            .output-container {
+                max-height: 40vh;
+            }
+            .output {
+                font-size: 10px;
+            }
+            button {
+                padding: 12px;
+                font-size: 0.85em;
+            }
+        }
     </style>
 </head>
 <body>
@@ -121,35 +166,83 @@
                 });
                 p = bestP;
             }
-            return { code: c[1].toLowerCase(), prov: p, lat: c[3], lng: c[4] };
+            const lat = c[3], lng = c[4];
+            const dist = selectedPoint ? selectedPoint.distanceTo(L.latLng(lat, lng)) : 0;
+            return { code: c[1].toLowerCase(), prov: p, lat, lng, dist };
         });
 
-        let sP = new Set(), res = ["region put nl"];
-        cleanedCities.forEach(c => sP.add(c.prov));
-        sP.forEach(p => res.push(`region put nl-${p} nl`));
+        // Sorteer op afstand (dichtstbijzijnde eerst)
+        cleanedCities.sort((a, b) => a.dist - b.dist);
+
+        const clampName = (name) => name.length > 30 ? name.slice(0, 30) : name;
+
+        // Bouw een lijst van provincies en gemeenten, met max 32 unieke region-namen
+        // 1 voor 'nl', de rest verdelen over provincies + gemeenten, waarbij we
+        // altijd bij de dichtstbijzijnde beginnen.
+        let res = [];
+        const provincesSet = new Set();
+        const pickedCities = [];
+        let regionCount = 0;
+
+        // Altijd het land toevoegen
+        res.push(`region put ${clampName("nl")}`);
+        regionCount += 1; // nl
+
         cleanedCities.forEach(c => {
-            // Alleen provincie-prefix (nl-ge-elb), geen standalone nl-elb — plaats hoort bij provincie
-            res.push(`region put nl-${c.prov}-${c.code} nl-${c.prov}`);
+            if (regionCount >= 32) return;
+
+            const needsProv = !provincesSet.has(c.prov);
+            const extraRegionsIfAdded = (needsProv ? 1 : 0) + 1; // provincie (optioneel) + gemeente
+
+            if (regionCount + extraRegionsIfAdded > 32) {
+                return;
+            }
+
+            // Neem deze stad/gemeente mee
+            if (needsProv) {
+                provincesSet.add(c.prov);
+                regionCount += 1;
+            }
+            pickedCities.push(c);
+            regionCount += 1;
         });
+
+        // Nu de daadwerkelijke commands op basis van de gekozen set
+        provincesSet.forEach(p => {
+            const rName = clampName(`nl-${p}`);
+            res.push(`region put ${rName} nl`);
+        });
+
+        pickedCities.forEach(c => {
+            const cityRegion = clampName(`nl-${c.prov}-${c.code}`);
+            const provRegion = clampName(`nl-${c.prov}`);
+            res.push(`region put ${cityRegion} ${provRegion}`);
+        });
+
         res.push("region allowf nl");
-        sP.forEach(p => res.push(`region allowf nl-${p}`));
-        cleanedCities.forEach(c => {
-            res.push(`region allowf nl-${c.prov}-${c.code}`);
+        provincesSet.forEach(p => {
+            const rName = clampName(`nl-${p}`);
+            res.push(`region allowf ${rName}`);
+        });
+        pickedCities.forEach(c => {
+            const cityRegion = clampName(`nl-${c.prov}-${c.code}`);
+            res.push(`region allowf ${cityRegion}`);
         });
 
-        // Bepaal home als de plaats die het dichtst bij het geselecteerde punt ligt
-        let home = cleanedCities[0];
-        if (selectedPoint) {
-            let best = cleanedCities[0];
+        // Bepaal home als de dichtstbijzijnde gekozen plaats
+        let home = pickedCities[0] || cleanedCities[0];
+        if (selectedPoint && pickedCities.length > 0) {
+            let best = pickedCities[0];
             let bestDist = selectedPoint.distanceTo(L.latLng(best.lat, best.lng));
-            cleanedCities.forEach(c => {
+            pickedCities.forEach(c => {
                 const d = selectedPoint.distanceTo(L.latLng(c.lat, c.lng));
                 if (d < bestDist) { bestDist = d; best = c; }
             });
             home = best;
         }
 
-        res.push(`region home nl-${home.prov}-${home.code}`, "region save");
+        const homeRegion = clampName(`nl-${home.prov}-${home.code}`);
+        res.push(`region home ${homeRegion}`, "region save");
         _output.innerText = res.join("\n");
     }
 
