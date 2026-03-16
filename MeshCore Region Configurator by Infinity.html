@@ -21,6 +21,8 @@
         .label-main { font-size: 0.8em; display: block; margin-bottom: 5px; color: #888; text-transform: uppercase; }
         .slider-val { color: #4af626; font-weight: bold; font-size: 2.8em; display: block; line-height: 1; text-shadow: 0 0 10px rgba(74, 246, 38, 0.6); }
         input[type=range] { width: 100%; margin: 10px 0; accent-color: #4af626; cursor: pointer; }
+        .mode-toggle { margin-bottom: 10px; display: flex; justify-content: center; }
+        .mode-toggle button { width: 100%; }
         .output-container { flex: 1; display: flex; flex-direction: column; min-height: 0; margin-bottom: 10px; }
         .output { background: #000; color: #4af626; padding: 15px; border: 1px solid #1a5a0f; font-size: 11px; overflow-y: auto; flex: 1; white-space: pre-wrap; line-height: 1.4; }
         button { padding: 15px; background: transparent; border: 1px solid #4af626; color: #4af626; cursor: pointer; font-family: inherit; font-weight: bold; text-transform: uppercase; }
@@ -88,6 +90,9 @@
             <input id="range" type="range" min="5" max="25" value="10">
             <span style="font-size: 1.4em; color: #555;">KILOMETER BEREIK</span>
         </div>
+        <div class="mode-toggle">
+            <button id="mode-btn">Niveau: Provincie (simpel)</button>
+        </div>
         <div class="output-container">
             <div id="code-output" class="output">Klik op de kaart of zoek een stad...</div>
         </div>
@@ -110,6 +115,7 @@
     
     let selectedPoint = null;
     let visualCircle = null;
+    let mode = 'simple'; // 'advanced' = gemeente-niveau, 'simple' = alleen provincies
 
     // Zoekfunctie
     _searchInput.addEventListener('input', function() {
@@ -132,6 +138,15 @@
             });
         }
     });
+
+    const _modeBtn = document.getElementById('mode-btn');
+    _modeBtn.onclick = () => {
+        mode = (mode === 'advanced') ? 'simple' : 'advanced';
+        _modeBtn.innerText = mode === 'advanced'
+            ? 'Niveau: Gemeente (uitgebreid)'
+            : 'Niveau: Provincie (simpel)';
+        updateSelection();
+    };
 
     function selectCity(lat, lng) {
         selectedPoint = L.latLng(lat, lng);
@@ -176,74 +191,122 @@
 
         const clampName = (name) => name.length > 30 ? name.slice(0, 30) : name;
 
-        // Bouw een lijst van provincies en gemeenten, met max 32 unieke region-namen
-        // 1 voor 'nl', de rest verdelen over provincies + gemeenten, waarbij we
-        // altijd bij de dichtstbijzijnde beginnen.
-        let res = [];
-        const provincesSet = new Set();
-        const pickedCities = [];
-        let regionCount = 0;
+        // SIMPLE MODE: alleen provincie-niveau (nl-ge, nl-fl, nl-ov, ...)
+        if (mode === 'simple') {
+            let res = [];
+            const provincesSet = new Set();
 
-        // Altijd het land toevoegen
-        res.push(`region put ${clampName("nl")}`);
-        regionCount += 1; // nl
+            // Altijd land-niveau
+            res.push(`region put ${clampName("nl")}`);
 
-        cleanedCities.forEach(c => {
-            if (regionCount >= 32) return;
+            cleanedCities.forEach(c => provincesSet.add(c.prov));
 
-            const needsProv = !provincesSet.has(c.prov);
-            const extraRegionsIfAdded = (needsProv ? 1 : 0) + 1; // provincie (optioneel) + gemeente
-
-            if (regionCount + extraRegionsIfAdded > 32) {
-                return;
-            }
-
-            // Neem deze stad/gemeente mee
-            if (needsProv) {
-                provincesSet.add(c.prov);
-                regionCount += 1;
-            }
-            pickedCities.push(c);
-            regionCount += 1;
-        });
-
-        // Nu de daadwerkelijke commands op basis van de gekozen set
-        provincesSet.forEach(p => {
-            const rName = clampName(`nl-${p}`);
-            res.push(`region put ${rName} nl`);
-        });
-
-        pickedCities.forEach(c => {
-            const cityRegion = clampName(`nl-${c.prov}-${c.code}`);
-            const provRegion = clampName(`nl-${c.prov}`);
-            res.push(`region put ${cityRegion} ${provRegion}`);
-        });
-
-        res.push("region allowf nl");
-        provincesSet.forEach(p => {
-            const rName = clampName(`nl-${p}`);
-            res.push(`region allowf ${rName}`);
-        });
-        pickedCities.forEach(c => {
-            const cityRegion = clampName(`nl-${c.prov}-${c.code}`);
-            res.push(`region allowf ${cityRegion}`);
-        });
-
-        // Bepaal home als de dichtstbijzijnde gekozen plaats
-        let home = pickedCities[0] || cleanedCities[0];
-        if (selectedPoint && pickedCities.length > 0) {
-            let best = pickedCities[0];
-            let bestDist = selectedPoint.distanceTo(L.latLng(best.lat, best.lng));
-            pickedCities.forEach(c => {
-                const d = selectedPoint.distanceTo(L.latLng(c.lat, c.lng));
-                if (d < bestDist) { bestDist = d; best = c; }
+            // Max 32 namen totaal; we hebben er al 1 gebruikt voor 'nl'
+            let count = 1;
+            const orderedProvs = [];
+            cleanedCities.forEach(c => {
+                if (count >= 32) return;
+                if (!provincesSet.has(c.prov)) return;
             });
-            home = best;
+
+            // Bewaar volgorde op basis van afstand
+            cleanedCities.forEach(c => {
+                if (!orderedProvs.includes(c.prov) && count < 32) {
+                    orderedProvs.push(c.prov);
+                    count++;
+                }
+            });
+
+            orderedProvs.forEach(p => {
+                const rName = clampName(`nl-${p}`);
+                res.push(`region put ${rName} nl`);
+            });
+
+            res.push("region allowf nl");
+            orderedProvs.forEach(p => {
+                const rName = clampName(`nl-${p}`);
+                res.push(`region allowf ${rName}`);
+            });
+
+            // Home = provincie van dichtstbijzijnde stad
+            const home = cleanedCities[0];
+            const homeRegion = clampName(`nl-${home.prov}`);
+            res.push(`region home ${homeRegion}`, "region save");
+            _output.innerText = res.join("\n");
+            return;
         }
 
-        const homeRegion = clampName(`nl-${home.prov}-${home.code}`);
-        res.push(`region home ${homeRegion}`, "region save");
-        _output.innerText = res.join("\n");
+        // ADVANCED MODE: huidige gedrag met gemeenten + provincies, max 32 namen
+        {
+            // Bouw een lijst van provincies en gemeenten, met max 32 unieke region-namen
+            // 1 voor 'nl', de rest verdelen over provincies + gemeenten, waarbij we
+            // altijd bij de dichtstbijzijnde beginnen.
+            let res = [];
+            const provincesSet = new Set();
+            const pickedCities = [];
+            let regionCount = 0;
+
+            // Altijd het land toevoegen
+            res.push(`region put ${clampName("nl")}`);
+            regionCount += 1; // nl
+
+            cleanedCities.forEach(c => {
+                if (regionCount >= 32) return;
+
+                const needsProv = !provincesSet.has(c.prov);
+                const extraRegionsIfAdded = (needsProv ? 1 : 0) + 1; // provincie (optioneel) + gemeente
+
+                if (regionCount + extraRegionsIfAdded > 32) {
+                    return;
+                }
+
+                // Neem deze stad/gemeente mee
+                if (needsProv) {
+                    provincesSet.add(c.prov);
+                    regionCount += 1;
+                }
+                pickedCities.push(c);
+                regionCount += 1;
+            });
+
+            // Nu de daadwerkelijke commands op basis van de gekozen set
+            provincesSet.forEach(p => {
+                const rName = clampName(`nl-${p}`);
+                res.push(`region put ${rName} nl`);
+            });
+
+            pickedCities.forEach(c => {
+                const cityRegion = clampName(`nl-${c.prov}-${c.code}`);
+                const provRegion = clampName(`nl-${c.prov}`);
+                res.push(`region put ${cityRegion} ${provRegion}`);
+            });
+
+            res.push("region allowf nl");
+            provincesSet.forEach(p => {
+                const rName = clampName(`nl-${p}`);
+                res.push(`region allowf ${rName}`);
+            });
+            pickedCities.forEach(c => {
+                const cityRegion = clampName(`nl-${c.prov}-${c.code}`);
+                res.push(`region allowf ${cityRegion}`);
+            });
+
+            // Bepaal home als de dichtstbijzijnde gekozen plaats
+            let home = pickedCities[0] || cleanedCities[0];
+            if (selectedPoint && pickedCities.length > 0) {
+                let best = pickedCities[0];
+                let bestDist = selectedPoint.distanceTo(L.latLng(best.lat, best.lng));
+                pickedCities.forEach(c => {
+                    const d = selectedPoint.distanceTo(L.latLng(c.lat, c.lng));
+                    if (d < bestDist) { bestDist = d; best = c; }
+                });
+                home = best;
+            }
+
+            const homeRegion = clampName(`nl-${home.prov}-${home.code}`);
+            res.push(`region home ${homeRegion}`, "region save");
+            _output.innerText = res.join("\n");
+        }
     }
 
     _rangeSlider.oninput = updateSelection;
