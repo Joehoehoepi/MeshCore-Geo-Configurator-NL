@@ -46,11 +46,12 @@ For a border area, the tool calculates the required logic instantly:
 region put nl
 region put nl-ge nl
 region put nl-fl nl
-region put nl-ge-elb elb
-region put nl-fl-dro dro
+region put nl-ov nl
 region allowf nl
 region allowf nl-ge
-...
+region allowf nl-fl
+region allowf nl-ov
+region home nl-ge
 region save
 
 ```
