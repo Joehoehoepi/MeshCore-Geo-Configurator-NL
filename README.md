@@ -34,7 +34,7 @@ If you set a coverage radius of 10 kilometers around Elburg, your signal crosses
 
 1. **Launch:** Open the `MeshCore Region Configurator by Infinity.html` file in any modern web browser (make sure the `nl-locode-db.js` is in the same map as the .html).
 2. **Set Range:** Use the slider to set your desired coverage radius (in kilometers).
-3. **Locate:** Click on your node's exact location on the map.
+3. **Locate:** Click on your node's exact location on the map, or type in the name of your location in the searchbar.
 4. **Copy:** Click the **⚡ COPY CONFIGURATION** button to grab the generated CLI block.
 5. **Apply:** Paste the commands directly into your MeshCore CLI and you're done.
 
