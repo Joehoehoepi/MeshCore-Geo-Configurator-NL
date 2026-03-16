@@ -1,8 +1,8 @@
-# MeshCore Geo Configurator by Infinity
+# MeshCore Region Configurator by Infinity
 
 🌐 **Overview**
 
-The **MeshCore Geo Configurator** is a professional-grade utility designed for the Dutch MeshCore community. It streamlines the configuration of regional settings for LoRa/Mesh nodes by providing an intuitive, map-based interface to generate precise CLI commands.
+The **MeshCore Region Configurator** is a professional-grade utility designed for the Dutch MeshCore community. It streamlines the configuration of regional settings for LoRa/Mesh nodes by providing an intuitive, map-based interface to generate precise CLI commands.
 
 🎯 **The "Triple-Border" Challenge**
 
