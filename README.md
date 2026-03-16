@@ -1,4 +1,4 @@
-# MeshCore Region Configurator by Infinity
+# MeshCore Region Configurator for the Netherlands by Infinity
 
 🌐 **Overview**
 
