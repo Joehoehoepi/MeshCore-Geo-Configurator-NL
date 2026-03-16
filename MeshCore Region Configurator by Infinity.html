@@ -2,7 +2,7 @@
 <html lang="nl">
 <head>
     <meta charset="utf-8">
-    <title>MeshCore Region Configurator by Infinity</title>
+    <title>MeshCore Geo Configurator by Infinity</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin=""/>
     <style>
         body { margin: 0; padding: 0; background-color: #000; color: #4af626; font-family: 'Consolas', monospace; height: 100vh; display: flex; justify-content: center; align-items: center; overflow: hidden; }
@@ -31,7 +31,7 @@
 <div class="main-wrapper">
     <div id="map"></div>
     <div class="controls-panel">
-        <h2>MeshCore Region Configurator by Infinity</h2>
+        <h2>MeshCore Region Configurator</h2>
         <div class="search-box">
             <span class="label-main">Zoek een stad</span>
             <input type="text" id="city-search" placeholder="Type stadnaam..." autocomplete="off">
@@ -121,23 +121,34 @@
                 });
                 p = bestP;
             }
-            return { code: c[1].toLowerCase(), prov: p };
+            return { code: c[1].toLowerCase(), prov: p, lat: c[3], lng: c[4] };
         });
 
         let sP = new Set(), res = ["region put nl"];
         cleanedCities.forEach(c => sP.add(c.prov));
         sP.forEach(p => res.push(`region put nl-${p} nl`));
         cleanedCities.forEach(c => {
-            res.push(`region put nl-${c.code} nl`);
+            // Alleen provincie-prefix (nl-ge-elb), geen standalone nl-elb — plaats hoort bij provincie
             res.push(`region put nl-${c.prov}-${c.code} nl-${c.prov}`);
         });
         res.push("region allowf nl");
         sP.forEach(p => res.push(`region allowf nl-${p}`));
         cleanedCities.forEach(c => {
-            res.push(`region allowf nl-${c.code}`);
             res.push(`region allowf nl-${c.prov}-${c.code}`);
         });
-        const home = cleanedCities[0];
+
+        // Bepaal home als de plaats die het dichtst bij het geselecteerde punt ligt
+        let home = cleanedCities[0];
+        if (selectedPoint) {
+            let best = cleanedCities[0];
+            let bestDist = selectedPoint.distanceTo(L.latLng(best.lat, best.lng));
+            cleanedCities.forEach(c => {
+                const d = selectedPoint.distanceTo(L.latLng(c.lat, c.lng));
+                if (d < bestDist) { bestDist = d; best = c; }
+            });
+            home = best;
+        }
+
         res.push(`region home nl-${home.prov}-${home.code}`, "region save");
         _output.innerText = res.join("\n");
     }
