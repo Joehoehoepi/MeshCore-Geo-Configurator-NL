@@ -1,25 +1,30 @@
-name: Auto Sync Mesh-Up Data
+name: Auto Sync Mesh-Up Cities
 on:
   schedule:
     - cron: '0 0 * * 1'  # Elke maandagnacht om 00:00 uur
-  workflow_dispatch:      # Hiermee kun je ook handmatig op "Start" drukken
+  workflow_dispatch:      # Hiermee kun je zelf op de knop drukken om te testen
 
 jobs:
-  update-data:
+  update-cities:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout mijn code
+      - name: Checkout jouw Meshfinity code
         uses: actions/checkout@v3
 
-      - name: Haal de nieuwste data van de bron
+      - name: Haal de nieuwste cities.js op van Mesh-up
         run: |
-          # Hier downloaden we het nieuwe bestand van de bron-website
-          curl -L "https://link-naar-bron-mesh-up/data.json" -o data/municipalities.json
+          # We downloaden het JS bestand direct van de bron
+          curl -L "https://www.mesh-up.nl/mc-rp-autoconfig/src/cities.js" -o src/cities.js
 
-      - name: Controleer en Commit
+      - name: Controleer op wijzigingen en verwerk deze
         run: |
           git config --global user.name 'Meshfinity-Bot'
           git config --global user.email 'bot@meshfinity.nl'
-          git add data/municipalities.json
-          # Alleen committen als er echt iets veranderd is
-          git diff --quiet && git diff --staged --quiet || (git commit -m "Automatische update: Mesh-up Database ververst" && git push)
+          git add src/cities.js
+          # Alleen pushen als er daadwerkelijk een nieuwe gemeente is toegevoegd of aangepast
+          if git diff --staged --quiet; then
+            echo "Geen wijzigingen gevonden in de stedenlijst."
+          else
+            git commit -m "Automatische update: cities.js gesynchroniseerd met Mesh-up bron"
+            git push
+          fi
