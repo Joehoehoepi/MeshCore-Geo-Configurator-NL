@@ -66,7 +66,7 @@ This edition uses **JavaScript Obfuscation** to protect the internal municipal d
 
 A huge thank you to **Ruben** from **[Mesh-Up.nl](https://mesh-up.nl)** for providing and sharing the complete, high-quality dataset of all municipalities, Locodes and coordinates in the Netherlands. 
 
-The configurator wouldn't be as accurate and powerful without this essential contribution to the Dutch Meshtastic community!
+The configurator wouldn't be as accurate and powerful without this essential contribution to the Dutch MeshCore community!
 
 ---
 
