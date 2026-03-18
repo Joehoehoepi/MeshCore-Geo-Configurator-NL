@@ -1,6 +1,6 @@
 name: Auto Sync Mesh-Up Cities
 
-# We zetten de krachtige 'force' knop op het hoogste niveau
+# Forceer Node 24 op globaal niveau
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
 
@@ -12,12 +12,16 @@ on:
 jobs:
   update-cities:
     runs-on: ubuntu-latest
+    # We herhalen de force-knop hier nogmaals voor de zekerheid
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
+    
     steps:
       - name: Checkout jouw Meshfinity code
         uses: actions/checkout@v4
         with:
-          # Soms helpt het om expliciet de laatste commit te pakken
-          persist-credentials: false 
+          # We zorgen dat de robot de juiste rechten behoudt
+          persist-credentials: true
 
       - name: Haal de nieuwste cities.js op
         run: |
@@ -30,9 +34,10 @@ jobs:
           git config --global user.email 'bot@meshfinity.nl'
           git add src/cities.js
           
+          # Alleen pushen als er echt iets nieuws is
           if git diff --staged --quiet; then
-            echo "Geen wijzigingen gevonden."
+            echo "Geen wijzigingen gevonden. Database is al actueel."
           else
-            git commit -m "Automatische update: cities.js via Node 24 Runner"
+            git commit -m "Automatische update: cities.js (Sync via Node 24)"
             git push
           fi
