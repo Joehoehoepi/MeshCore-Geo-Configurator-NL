@@ -35,7 +35,7 @@ If you set a coverage radius of 10 kilometers around Elburg, your signal crosses
 1. **Launch:** Open the `MeshCore Region Configurator by Infinity.html` file in any modern web browser (make sure the `nl-locode-db.js` is in the same map as the .html).
 2. **Set Range:** Use the slider to set your desired coverage radius (in kilometers).
 3. **Locate:** Click on your node's exact location on the map, or type in the name of your location in the searchbar.
-4. **Copy:** Click the **⚡ COPY CONFIGURATION** button to grab the generated CLI block.
+4. **Copy:** Click the **⚡ DEPLOY CONFIGURATION** button to grab the generated CLI block.
 5. **Apply:** Paste the commands directly into your MeshCore CLI and you're done.
 
 📋 **Example CLI Output**
@@ -59,6 +59,14 @@ region save
 🔒 **Integrity & Security**
 
 This edition uses **JavaScript Obfuscation** to protect the internal municipal database and logic from accidental tampering. This ensures the tool remains a reliable, "single-source-of-truth" for the community while remaining easy to distribute.
+
+---
+
+🎖️ Special Thanks
+
+A huge thank you to **Ruben** from **[Mesh-Up.nl](https://mesh-up.nl)** for providing and sharing the complete, high-quality dataset of all municipalities and coordinates in the Netherlands. 
+
+The configurator wouldn't be as accurate and powerful without this essential contribution to the Dutch Meshtastic community!
 
 ---
 
