@@ -2,23 +2,22 @@ name: Auto Sync Mesh-Up Cities
 on:
   schedule:
     - cron: '0 0 * * 1'  # Elke maandagnacht om 00:00 uur
-  workflow_dispatch:      # Zodat je zelf op de knop kunt drukken
+  workflow_dispatch:      # Handmatige knop om te testen
 
+# Dit is de fix voor de Node.js 24 waarschuwing:
 env:
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true  # We gaan direct over op de nieuwe standaard
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
   update-cities:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout jouw Meshfinity code
-        uses: actions/checkout@v4  # Geüpdatet naar v4 voor Node.js 24 support
+        uses: actions/checkout@v4  # v4 is goed, we dwingen nu alleen Node 24 af via de env hierboven
 
       - name: Haal de nieuwste cities.js op van Mesh-up
         run: |
-          # Zorg dat de map bestaat
           mkdir -p src
-          # Download het bestand
           curl -L "https://www.mesh-up.nl/mc-rp-autoconfig/src/cities.js" -o src/cities.js
 
       - name: Controleer op wijzigingen en verwerk deze
@@ -27,10 +26,9 @@ jobs:
           git config --global user.email 'bot@meshfinity.nl'
           git add src/cities.js
           
-          # Check of er echt iets veranderd is
           if git diff --staged --quiet; then
-            echo "Geen wijzigingen gevonden."
+            echo "Geen wijzigingen gevonden in de stedenlijst."
           else
-            git commit -m "Automatische update: cities.js gesynchroniseerd met Node 24 runner"
+            git commit -m "Automatische update: cities.js gesynchroniseerd (Node 24)"
             git push
           fi
